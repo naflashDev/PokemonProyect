@@ -3,10 +3,10 @@ generator client {
 }
 
 datasource db {
-  // Use the libsql provider for Turso Cloud. Provider must be a literal token
-  // (Prisma schema doesn't accept env() for provider). Ensure your Prisma
-  // version supports the `libsql` provider (upgrade if needed).
-  provider = "libsql"
+  // Use sqlite provider for now to match the installed Prisma version.
+  // To enable Turso `libsql://` URLs you must upgrade Prisma to a version
+  // that supports the `libsql` provider and then set provider to "libsql".
+  provider = "sqlite"
   // The URL should be provided via TURSO_DATABASE_URL (e.g. libsql://...)
   // For local development you may set TURSO_DATABASE_URL="file:./dev.db".
   url      = env("TURSO_DATABASE_URL", "file:./dev.db")
