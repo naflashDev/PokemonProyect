@@ -9,7 +9,24 @@ export async function POST(req: NextRequest) {
     if (!pokemonId) return NextResponse.json({ error: 'pokemonId required' }, { status: 400 })
 
     // require authentication to write per-user statuses
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+    // Debug: log incoming cookie header to help diagnose missing token in prod
+    try {
+      const cookieHeader = req.headers.get('cookie')
+      console.log('[API][pokemon/mark] cookie header:', cookieHeader)
+    } catch (_) {}
+
+    let token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+    if (!token) {
+      // try extracting token from cookie header explicitly (helps in some deploy envs)
+      try {
+        const cookieHeader = req.headers.get('cookie') || undefined
+        if (cookieHeader) {
+          token = await getToken({ cookie: cookieHeader, secret: process.env.NEXTAUTH_SECRET } as any)
+        }
+      } catch (err) {
+        try { console.log('[API][pokemon/mark] getToken fallback error:', String(err)) } catch (_) {}
+      }
+    }
     const userId = token?.sub ? Number((token as any).sub) : undefined
     if (!userId) return NextResponse.json({ error: 'authentication required' }, { status: 401 })
 
