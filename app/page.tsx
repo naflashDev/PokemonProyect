@@ -50,7 +50,6 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
             try { localStorage.setItem(`pokedex-progress:${detail.pokedex}`, String(detail.percent)) } catch (_) {}
             const p = Math.max(0, Math.min(100, Number(detail.percent)))
             setList(prev => prev.map(px => px.slug === detail.pokedex ? { ...px, progress: { percent: p } } : px))
-            if (selected) setSelectedPercent(detail.pokedex === selected ? p : selectedPercent)
             return
           }
 
@@ -65,15 +64,6 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
               const newPercent = detail.total === 0 ? 0 : Math.round((newCount / detail.total) * 100)
               return { ...px, progress: { percent: Math.max(0, Math.min(100, newPercent)) } }
             }))
-            if (selected && detail.pokedex === selected) {
-              setSelectedPercent((s) => {
-                const prev = Number(s ?? 0)
-                const prevCount = Math.round((prev / 100) * detail.total)
-                const newCount = prevCount + detail.deltaCaptured
-                const newPercent = detail.total === 0 ? 0 : Math.round((newCount / detail.total) * 100)
-                return Math.max(0, Math.min(100, newPercent))
-              })
-            }
             return
           }
 
