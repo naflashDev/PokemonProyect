@@ -1,21 +1,24 @@
 import { describe, it } from 'vitest'
 import { PrismaUserPokemonStatusRepository } from '../../src/infrastructure/repositories/PrismaUserPokemonStatusRepository'
+import prisma from '../../src/prisma/client'
 
 // Integration test: runs only when RUN_INTEGRATION=1
 if (process.env.RUN_INTEGRATION === '1') {
   describe('PrismaUserPokemonStatusRepository (integration)', () => {
     it('upsertPartial and countCapturedByUserAndPokedex roundtrip', async () => {
       const repo = new PrismaUserPokemonStatusRepository()
-    // This test requires the prisma migrations to be applied and DATABASE_URL pointing to a test sqlite DB.
-    // It will create or update a status for userId=9999 and a pokemonId that exists in the DB.
-    // Adjust the ids according to your test DB.
-    const userId = 9999
-    const pokemonId = 1
+      // This test will create the minimal fixtures it needs (user, pokedex, pokemon, join)
+      const user = await prisma.user.create({ data: {} })
+      const pokedex = await prisma.pokedex.create({ data: { slug: 'national', name: 'National' } })
+      const pokemon = await prisma.pokemon.create({ data: { nationalId: 1, name: 'Testmon', types: 'normal', pokedexId: pokedex.id } })
+      await prisma.pokedexPokemon.create({ data: { pokedexId: pokedex.id, pokemonId: pokemon.id } })
 
-    await repo.upsertPartial(userId, pokemonId, { has: true, seen: true })
-    const count = await repo.countCapturedByUserAndPokedex(userId, 'national') // replace 'national' with an actual slug if needed
-    // cannot assert exact number in generic DB; just ensure call does not throw
-    console.log('captured count:', count)
+      const userId = user.id
+      const pokemonId = pokemon.id
+
+      await repo.upsertPartial(userId, pokemonId, { has: true, seen: true })
+      const count = await repo.countCapturedByUserAndPokedex(userId, 'national')
+      console.log('captured count:', count)
   })
   })
 } else {

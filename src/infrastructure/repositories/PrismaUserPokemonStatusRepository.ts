@@ -38,6 +38,15 @@ export class PrismaUserPokemonStatusRepository implements IUserPokemonStatusRepo
     const createData: any = {
       userId,
       pokemonId,
+      user: {
+        connectOrCreate: {
+          where: { id: userId },
+          create: { id: userId }
+        }
+      },
+      pokemon: {
+        connect: { id: pokemonId }
+      },
       has: data.has ?? false,
       shinyOnly: data.shinyOnly ?? false,
       allForms: data.allForms ?? false,
