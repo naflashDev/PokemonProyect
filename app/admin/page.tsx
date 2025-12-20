@@ -192,7 +192,7 @@ function CatalogManager() {
   return (
     <div className="space-y-3">
       <div className="flex gap-2 mb-2">
-        <button className="px-3 py-2 bg-sky-600 rounded" onClick={load} disabled={loading}>{loading ? 'Cargando...' : 'Cargar catálogo'}</button>
+        <button className="px-3 py-2 bg-sky-600 rounded" onClick={() => void load()} disabled={loading}>{loading ? 'Cargando...' : 'Cargar catálogo'}</button>
         <div className="text-sm text-gray-400">{msg}</div>
       </div>
       <div className="grid grid-cols-5 gap-3">
