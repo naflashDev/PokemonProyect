@@ -3,11 +3,12 @@ generator client {
 }
 
 datasource db {
-  // If you're using Turso Cloud, the connection string uses the `libsql://` scheme.
-  // Prisma supports a dedicated `libsql` provider (ensure your Prisma CLI/client
-  // version supports it). When `TURSO_DATABASE_URL` is present we prefer `libsql`.
-  // For local dev we keep a `file:` fallback so `prisma` validation does not fail.
-  provider = env("PRISMA_DB_PROVIDER", "libsql")
+  // Use the libsql provider for Turso Cloud. Provider must be a literal token
+  // (Prisma schema doesn't accept env() for provider). Ensure your Prisma
+  // version supports the `libsql` provider (upgrade if needed).
+  provider = "libsql"
+  // The URL should be provided via TURSO_DATABASE_URL (e.g. libsql://...)
+  // For local development you may set TURSO_DATABASE_URL="file:./dev.db".
   url      = env("TURSO_DATABASE_URL", "file:./dev.db")
 }
 
