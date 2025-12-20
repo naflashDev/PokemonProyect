@@ -17,11 +17,20 @@ export async function POST(req: NextRequest) {
 
     let token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
     if (!token) {
-      // try extracting token from cookie header explicitly (helps in some deploy envs)
+      // try extracting session cookie manually and decode it as a fallback
       try {
-        const cookieHeader = req.headers.get('cookie') || undefined
-        if (cookieHeader) {
-          token = await getToken({ cookie: cookieHeader, secret: process.env.NEXTAUTH_SECRET } as any)
+        const cookieHeader = req.headers.get('cookie') || ''
+        // parse cookies into a map
+        const cookieMap = Object.fromEntries(cookieHeader.split(';').map(c => c.split('=').map(s => s.trim())) as any)
+        const possibleNames = ['__Secure-next-auth.session-token', 'next-auth.session-token', 'next-auth-session-token']
+        const cookieValue = possibleNames.map(n => cookieMap[n]).find(Boolean)
+        try { console.log('[API][pokemon/mark] parsed cookie names present:', possibleNames.map(n => !!cookieMap[n])) } catch (_) {}
+        if (cookieValue) {
+          // getToken can accept a raw token in some environments; use `as any` to be tolerant
+          token = await getToken({ token: cookieValue, secret: process.env.NEXTAUTH_SECRET } as any)
+          try { console.log('[API][pokemon/mark] token from cookie fallback present? ', !!token) } catch (_) {}
+        } else {
+          try { console.log('[API][pokemon/mark] no session cookie found in header') } catch (_) {}
         }
       } catch (err) {
         try { console.log('[API][pokemon/mark] getToken fallback error:', String(err)) } catch (_) {}
