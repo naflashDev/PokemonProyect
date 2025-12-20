@@ -47,7 +47,7 @@ async function main() {
         pokedexId: kanto.id
       },
       update: {}
-    }).catch(async (e) => {
+    }).catch(async (e: any) => {
       // fallback to create if upsert with fake where fails
       await prisma.pokemon.create({ data: { nationalId: p.nationalId, name: p.name, types: p.types, imageUrl: p.imageUrl, pokedexId: kanto.id } })
     })
