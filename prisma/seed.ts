@@ -7,13 +7,9 @@ async function main() {
     prismaModule = await import('../src/prisma/client')
   } catch (e1) {
     try {
-      prismaModule = await import('../src/prisma/client.ts')
+      prismaModule = await import('../src/prisma/client.js')
     } catch (e2) {
-      try {
-        prismaModule = await import('../src/prisma/client.js')
-      } catch (e3) {
-        throw new Error('Could not import prisma client from ../src/prisma/client(.ts|.js)')
-      }
+      throw new Error('Could not import prisma client from ../src/prisma/client(.js)')
     }
   }
   const prisma = prismaModule.default || prismaModule.prisma || prismaModule
