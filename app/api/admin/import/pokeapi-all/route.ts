@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
           }
           await repo.create(payload as any)
           results.push({ name: d.name, ok: true })
-        } catch (e) {
-          results.push({ name: e?.name ?? `idx-${i}`, ok: false })
+        } catch (err) {
+          const errName = err instanceof Error ? err.name : `idx-${i}`
+          results.push({ name: errName, ok: false })
         }
       }
     }
