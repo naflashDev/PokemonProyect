@@ -64,7 +64,7 @@ main()
   .finally(async () => {
     try {
       const prismaModule = await import('../src/prisma/client')
-      const prisma = prismaModule.default || prismaModule.prisma || prismaModule
+      const prisma = prismaModule.default || (prismaModule as any)
       await prisma.$disconnect()
     } catch (e) {
       // ignore
