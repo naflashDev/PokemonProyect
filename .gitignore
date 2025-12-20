@@ -1,4 +1,5 @@
 /node_modules
 /.next
+/migrations
 .env
 dev.db
