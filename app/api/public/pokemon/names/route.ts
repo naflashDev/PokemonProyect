@@ -5,7 +5,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const q = url.searchParams.get('q') ?? ''
-    const where = q ? { name: { contains: q, mode: 'insensitive' } } : {}
+    const where = q ? { name: { contains: q, mode: 'insensitive' as const } } : undefined
     const rows = await prisma.pokemon.findMany({ where, select: { name: true }, take: 50 })
     return NextResponse.json(rows.map(r => r.name))
   } catch (e: any) {
