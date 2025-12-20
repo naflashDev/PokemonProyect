@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react'
+import markQueue, { enqueueMark } from '../../lib/markQueue'
 
 type Pokemon = {
   id: number
@@ -61,51 +62,27 @@ export default function PokemonList({ pokedexSlug, onProgressUpdate }: { pokedex
       .finally(() => setLoading(false))
   }, [pokedexSlug, page, q])
 
+  
+
   async function markCaptured(pokemonId: number) {
     try {
       const current = items.find(it => it.id === pokemonId)
       const targetCaptured = current ? !current.captured : true
-      const res = await fetch('/api/pokemon/mark', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pokemonId, captured: targetCaptured }) })
-      const j = await res.json()
-      if (res.ok) {
-        // update local items optimistically
-        const updated = items.map(it => it.id === pokemonId ? { ...it, captured: targetCaptured } : it)
-        setItems(updated)
+      // optimistic update locally
+      const updated = items.map(it => it.id === pokemonId ? { ...it, captured: targetCaptured } : it)
+      setItems(updated)
 
-        // compute percent locally and dispatch exact percent (optimistic)
-        try {
-          const capturedCount = updated.filter(i => i.captured).length
-          const percentOptimistic = total === 0 ? 0 : Math.round((capturedCount / total) * 100)
-          console.log('[PokemonList] dispatching optimistic percent', { pokedex: pokedexSlug, percentOptimistic })
-          try { localStorage.setItem(`pokedex-progress:${pokedexSlug}`, String(percentOptimistic)) } catch (_) {}
-          window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, percent: percentOptimistic } }))
-          try { onProgressUpdate?.(percentOptimistic) } catch (_) {}
-        } catch (e) {
-          // fallback to previous behavior if something goes wrong
-          try {
-            const p = await fetch(`/api/pokedexes/progress?slug=${encodeURIComponent(pokedexSlug)}`, { credentials: 'include' })
-            const j = await p.json().catch(() => null)
-            const percent = j?.progress?.percent ?? null
-            if (typeof percent === 'number') {
-              console.log('[PokemonList] progress percent from server', { pokedex: pokedexSlug, percent })
-              try { localStorage.setItem(`pokedex-progress:${pokedexSlug}`, String(percent)) } catch (_) {}
-              window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, percent } }))
-              try { onProgressUpdate?.(percent) } catch (_) {}
-            } else {
-              console.log('[PokemonList] progress endpoint returned no percent, dispatching delta', { pokedex: pokedexSlug, targetCaptured, total })
-              const delta = targetCaptured ? 1 : -1
-              window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, deltaCaptured: delta, total } }))
-              try { onProgressUpdate?.(Math.max(0, Math.min(100, Math.round(((updated.filter(i => i.captured).length) / (total || 1)) * 100)))) } catch (_) {}
-            }
-          } catch (_) {
-            const delta = targetCaptured ? 1 : -1
-            window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, deltaCaptured: delta, total } }))
-            try { onProgressUpdate?.(Math.max(0, Math.min(100, Math.round(((updated.filter(i => i.captured).length) / (total || 1)) * 100)))) } catch (_) {}
-          }
-        }
-      } else {
-        console.error('Error toggling captured', j)
-      }
+      // compute optimistic percent and dispatch immediately
+      try {
+        const capturedCount = updated.filter(i => i.captured).length
+        const percentOptimistic = total === 0 ? 0 : Math.round((capturedCount / total) * 100)
+        try { localStorage.setItem(`pokedex-progress:${pokedexSlug}`, String(percentOptimistic)) } catch (_) {}
+        window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, percent: percentOptimistic } }))
+        try { onProgressUpdate?.(percentOptimistic) } catch (_) {}
+      } catch (_) {}
+
+      // enqueue change to reduce DB calls
+      try { enqueueMark({ pokemonId, pokedex: pokedexSlug, captured: targetCaptured }) } catch (e) { console.error(e) }
     } catch (e) { console.error(e) }
   }
 
@@ -113,25 +90,16 @@ export default function PokemonList({ pokedexSlug, onProgressUpdate }: { pokedex
     try {
       const current = items.find(it => it.id === pokemonId)
       const targetSeen = current ? !(current.seen ?? false) : true
-      const res = await fetch('/api/pokemon/mark', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pokemonId, seen: targetSeen }) })
-      const j = await res.json()
-      if (res.ok) {
-        const updated = items.map(it => it.id === pokemonId ? { ...it, seen: targetSeen } : it)
-        setItems(updated)
-        // seen doesn't change captured count, but dispatch optimistic percent to keep UI consistent
-        try {
-          const capturedCount = updated.filter(i => i.captured).length
-          const percentOptimistic = total === 0 ? 0 : Math.round((capturedCount / total) * 100)
-          console.log('[PokemonList] dispatching optimistic percent (seen toggle)', { pokedex: pokedexSlug, percentOptimistic })
-          try { localStorage.setItem(`pokedex-progress:${pokedexSlug}`, String(percentOptimistic)) } catch (_) {}
-          window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, percent: percentOptimistic } }))
-          try { onProgressUpdate?.(percentOptimistic) } catch (_) {}
-        } catch (e) {
-          window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, total } }))
-        }
-      } else {
-        console.error('Error toggling seen', j)
-      }
+      const updated = items.map(it => it.id === pokemonId ? { ...it, seen: targetSeen } : it)
+      setItems(updated)
+      try {
+        const capturedCount = updated.filter(i => i.captured).length
+        const percentOptimistic = total === 0 ? 0 : Math.round((capturedCount / total) * 100)
+        try { localStorage.setItem(`pokedex-progress:${pokedexSlug}`, String(percentOptimistic)) } catch (_) {}
+        window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, percent: percentOptimistic } }))
+        try { onProgressUpdate?.(percentOptimistic) } catch (_) {}
+      } catch (_) {}
+      try { enqueueMark({ pokemonId, pokedex: pokedexSlug, seen: targetSeen }) } catch (e) { console.error(e) }
     } catch (e) { console.error(e) }
   }
 
