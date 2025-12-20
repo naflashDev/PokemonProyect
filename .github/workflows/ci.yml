@@ -23,6 +23,8 @@ jobs:
         run: npx prisma generate
       - name: Apply migrations
         run: npx prisma migrate deploy
+      - name: Ensure DB schema (fallback for tests)
+        run: npx prisma db push
       - name: Run unit tests
         run: npm run test:unit
       - name: Run integration tests (optional)
