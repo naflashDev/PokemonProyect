@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+      # Provide a build-time fallback file URL so Prisma validation succeeds in CI
+      TURSO_DATABASE_URL_BUILD: "file:./dev.db"
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js
