@@ -45,8 +45,9 @@ export async function GET(req: NextRequest) {
   if (userId) {
     const ids = items.map(i => i.id).filter((v): v is number => typeof v === 'number')
     const statuses = await prisma.userPokemonStatus.findMany({ where: { userId, pokemonId: { in: ids } } })
-    const byId = Object.fromEntries(statuses.map(s => [s.pokemonId, s]))
+    const byId = Object.fromEntries(statuses.map(s => [s.pokemonId, s])) as Record<number, typeof statuses[0]>
     items = items.map(i => {
+      if (typeof i.id !== 'number') return { ...i, captured: false, seen: false }
       const s = byId[i.id]
       return { ...i, captured: s ? s.has ?? false : false, seen: s ? s.seen ?? false : false }
     })
