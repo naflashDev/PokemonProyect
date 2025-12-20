@@ -5,12 +5,11 @@ import { getToken } from 'next-auth/jwt'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Protect admin pages and admin API routes
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+  // Protect only admin API routes on the server side
+  if (pathname.startsWith('/api/admin')) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
     if (!token || (token as any).role !== 'ADMIN') {
-      const signInUrl = new URL('/api/auth/signin', req.url)
-      return NextResponse.redirect(signInUrl)
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
 
@@ -18,5 +17,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/admin/:path*']
+  matcher: ['/api/admin/:path*']
 }

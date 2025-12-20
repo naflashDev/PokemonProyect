@@ -1,7 +1,22 @@
-import prisma from '../src/prisma/client'
-
 async function main() {
   console.log('Running seed...')
+
+  // dynamic import to work with ts-node ESM/CJS interop
+  let prismaModule: any
+  try {
+    prismaModule = await import('../src/prisma/client')
+  } catch (e1) {
+    try {
+      prismaModule = await import('../src/prisma/client.ts')
+    } catch (e2) {
+      try {
+        prismaModule = await import('../src/prisma/client.js')
+      } catch (e3) {
+        throw new Error('Could not import prisma client from ../src/prisma/client(.ts|.js)')
+      }
+    }
+  }
+  const prisma = prismaModule.default || prismaModule.prisma || prismaModule
 
   const adminEmail = 'admin@example.com'
 
@@ -51,5 +66,11 @@ main()
     process.exit(1)
   })
   .finally(async () => {
-    await prisma.$disconnect()
+    try {
+      const prismaModule = await import('../src/prisma/client')
+      const prisma = prismaModule.default || prismaModule.prisma || prismaModule
+      await prisma.$disconnect()
+    } catch (e) {
+      // ignore
+    }
   })

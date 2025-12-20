@@ -8,38 +8,55 @@ datasource db {
 }
 
 model Pokedex {
-  id      Int      @id @default(autoincrement())
-  slug    String   @unique
-  name    String
-  game    String?
-  status  String   @default("draft") // draft | published
-  pokemons Pokemon[]
+  id              Int              @id @default(autoincrement())
+  slug            String           @unique
+  name            String
+  game            String?
+  status          String           @default("draft") // draft | published
+  pokemons        Pokemon[]
+  pokedexPokemons PokedexPokemon[] @relation("Pokedex_PokedexPokemon")
 }
 
 model Pokemon {
-  id         Int     @id @default(autoincrement())
-  nationalId Int
-  name       String
-  types      String
-  imageUrl   String?
-  pokedexId  Int
-  captured   Boolean @default(false)
-  shiny      Boolean @default(false)
-  complete   Boolean @default(false)
-  form       String?
-  notes      String?
-  pokedex    Pokedex @relation(fields: [pokedexId], references: [id])
+  id              Int                 @id @default(autoincrement())
+  nationalId      Int
+  name            String
+  types           String
+  imageUrl        String?
+  pokedexId       Int
+  captured        Boolean             @default(false)
+  shiny           Boolean             @default(false)
+  complete        Boolean             @default(false)
+  form            String?
+  notes           String?
+  pokedex         Pokedex             @relation(fields: [pokedexId], references: [id])
+  pokedexPokemons PokedexPokemon[]    @relation("Pokemon_PokedexPokemon")
+  statuses        UserPokemonStatus[]
+}
+
+// Intermediate table to allow many-to-many relation between Pokedex and Pokemon
+model PokedexPokemon {
+  id        Int @id @default(autoincrement())
+  pokedexId Int
+  pokemonId Int
+
+  pokedex Pokedex @relation("Pokedex_PokedexPokemon", fields: [pokedexId], references: [id], onDelete: Cascade)
+  pokemon Pokemon @relation("Pokemon_PokedexPokemon", fields: [pokemonId], references: [id], onDelete: Cascade)
+
+  @@unique([pokedexId, pokemonId])
 }
 
 model User {
-  id           Int    @id @default(autoincrement())
-  id           Int      @id @default(autoincrement())
-  name         String?
-  email        String   @unique
+  id            Int                 @id @default(autoincrement())
+  name          String?
+  email         String?             @unique
+  password      String?
   emailVerified DateTime?
-  image        String?
-  role         String   @default("USER") // USER | ADMIN
-  statuses     UserPokemonStatus[]
+  image         String?
+  role          String              @default("USER") // USER | ADMIN
+  statuses      UserPokemonStatus[]
+  accounts      Account[]
+  sessions      Session[]
 }
 
 model UserPokemonStatus {
@@ -50,26 +67,27 @@ model UserPokemonStatus {
   shinyOnly Boolean @default(false)
   allForms  Boolean @default(false)
 
-  user     User    @relation(fields: [userId], references: [id])
-  pokemon  Pokemon @relation(fields: [pokemonId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  pokemon Pokemon @relation(fields: [pokemonId], references: [id])
 
   @@unique([userId, pokemonId])
 }
 
 /// Models required by NextAuth (Accounts, Sessions, VerificationTokens)
 model Account {
-  id                 Int       @id @default(autoincrement())
-  userId             Int
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?   @map("refresh_token")
-  access_token       String?   @map("access_token")
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                       Int     @id @default(autoincrement())
+  userId                   Int
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? @map("refresh_token")
+  access_token             String? @map("access_token")
+  refresh_token_expires_in Int?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

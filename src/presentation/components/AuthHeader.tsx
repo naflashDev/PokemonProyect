@@ -1,6 +1,7 @@
 "use client"
 import { useSession, signIn, signOut } from 'next-auth/react'
 import React from 'react'
+import Link from 'next/link'
 
 export default function AuthHeader() {
   const { data: session, status } = useSession()
@@ -15,7 +16,10 @@ export default function AuthHeader() {
           <button onClick={() => signOut()} className="px-3 py-1 bg-red-600 rounded text-sm">Sign out</button>
         </>
       ) : (
-        <button onClick={() => signIn('github')} className="px-3 py-1 bg-green-600 rounded text-sm">Sign in with GitHub</button>
+        <>
+          <Link href="/signin" className="px-3 py-1 bg-green-600 rounded text-sm">Sign in</Link>
+          <Link href="/register" className="px-3 py-1 bg-slate-700 rounded text-sm">Register</Link>
+        </>
       )}
     </div>
   )
