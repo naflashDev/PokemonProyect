@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 // PokemonCard removed from admin page; keep component if used elsewhere
+import PokedexList from './components/PokedexList'
 
 export default function AdminPage() {
   const [slug, setSlug] = useState('')
@@ -15,13 +16,15 @@ export default function AdminPage() {
   const [message, setMessage] = useState('')
   const router = useRouter()
 
+  // expose load for CatalogManager's search via URL param or similar
+
   // Require session (client-side). Redirect to /signin if unauthenticated
   useSession({ required: true, onUnauthenticated() { router.push('/signin') } })
 
   async function createPokedex(e: React.FormEvent) {
     e.preventDefault()
     setMessage('Creando...')
-    const res = await fetch('/api/admin/pokedex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, name, game, initialPokemonNames: selectedNames }) })
+    const res = await fetch('/api/admin/pokedex', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, name, game, initialPokemonNames: selectedNames }) })
     const json = await res.json()
     if (res.ok) setMessage('Pokedex creada: ' + json.slug)
     else setMessage('Error: ' + json.error)
@@ -30,6 +33,11 @@ export default function AdminPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Panel Admin</h1>
+
+      <section className="mb-6">
+        <h2 className="font-semibold mb-2">Gestionar Pokédex</h2>
+        <PokedexList />
+      </section>
 
       <section className="mb-6">
         <h2 className="font-semibold mb-2">Crear Pokédex</h2>
@@ -88,8 +96,16 @@ export default function AdminPage() {
 
       <section className="mt-6">
         <h2 className="font-semibold mb-2">Catálogo (asignar a Pokédex)</h2>
-        <CatalogManager />
+            <CatalogManager />
       </section>
+
+          <section className="mt-6">
+            <h2 className="font-semibold mb-2">Buscar en Catálogo</h2>
+            <div className="mb-2 max-w-md">
+              <input placeholder="Buscar catálogo..." className="w-full p-2 rounded bg-gray-800 text-white" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <div className="text-sm text-gray-400 mt-1">Presiona "Cargar catálogo" para aplicar la búsqueda.</div>
+            </div>
+          </section>
 
       <section>
         <div className="mt-4">
@@ -100,7 +116,7 @@ export default function AdminPage() {
               if (!confirm('Esto importará TODOS los Pokémon desde PokeAPI a la pokedex interna `catalog`. Continuar?')) return
               setMessage('Importando catálogo... esto puede tardar varios minutos')
               try {
-                const r = await fetch('/api/admin/import/pokeapi-catalog', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concurrency: 8 }) })
+                  const r = await fetch('/api/admin/import/pokeapi-catalog', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concurrency: 8 }) })
                 const j = await r.json()
                 if (r.ok) setMessage(`Importados: ${j.imported}/${j.total}`)
                 else setMessage('Error: ' + j.error)
@@ -132,8 +148,8 @@ function CatalogManager() {
     setLoading(true)
     try {
       const [r1, r2] = await Promise.all([
-        fetch(`/api/admin/catalog/list?page=${p}&perPage=${perPage}&q=${encodeURIComponent(q)}`),
-        fetch('/api/admin/pokedex/list')
+        fetch(`/api/admin/catalog/list?page=${p}&perPage=${perPage}&q=${encodeURIComponent(q)}`, { credentials: 'include' }),
+        fetch('/api/admin/pokedex/list', { credentials: 'include' })
       ])
         const js1 = await r1.json()
         const js2 = await r2.json()
@@ -161,12 +177,14 @@ function CatalogManager() {
   async function assignMultiple(pokemonId: number, slugs: string[]) {
     setMsg('Asignando...')
     try {
-      const r = await fetch('/api/admin/catalog/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pokemonId, pokedexSlugs: slugs }) })
+      const r = await fetch('/api/admin/catalog/assign', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pokemonId, pokedexSlugs: slugs }) })
       const j = await r.json()
       if (r.ok) {
         setMsg('Asignado: ' + pokemonId)
-        // remove from list (considered assigned)
-        setItems(items.filter(i => i.id !== pokemonId))
+        // keep in list but mark as assigned locally (doesn't disappear)
+        setMsg('Asignado: ' + pokemonId)
+        // optionally annotate item as assigned to these slugs for visual feedback
+        setItems(items.map(i => i.id === pokemonId ? { ...i, assignedTo: slugs } : i))
       } else setMsg('Error: ' + j.error)
     } catch (e:any) { setMsg('Error: ' + e.message) }
   }
@@ -179,12 +197,19 @@ function CatalogManager() {
       </div>
       <div className="grid grid-cols-5 gap-3">
         {items.map(item => (
-          <div key={item.id} className="bg-gray-800 p-3 rounded flex flex-col items-stretch">
+          <div key={item.id} className="bg-gray-800 p-3 rounded flex flex-col items-stretch shadow-sm hover:shadow-md transition">
             <div className="flex-1 flex items-center justify-center mb-2">
               {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-20 h-20 object-contain" /> : <div className="w-20 h-20 bg-gray-700 rounded" />}
             </div>
             <div className="text-center capitalize font-semibold">{item.name}</div>
             <div className="text-sm text-gray-400 text-center">#{item.nationalId}</div>
+            {item.assignedTo && item.assignedTo.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1 justify-center">
+                {item.assignedTo.map((s:string) => (
+                  <span key={s} className="text-xs px-2 py-0.5 bg-green-700 rounded">{s}</span>
+                ))}
+              </div>
+            )}
             <div className="mt-2">
               <label className="text-xs text-gray-300">Asignar a (multiple)</label>
               <select multiple className="w-full mt-1 p-1 bg-gray-700 rounded h-24" value={selectedMap[item.id] || []} onChange={(e) => {

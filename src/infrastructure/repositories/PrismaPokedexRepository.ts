@@ -19,6 +19,17 @@ export class PrismaPokedexRepository implements IPokedexRepository {
     return new Pokedex({ id: row.id, slug: row.slug, name: row.name, game: row.game ?? undefined })
   }
 
+  async update(slug: string, data: { name?: string; game?: string; status?: string }): Promise<Pokedex> {
+    const row = await prisma.pokedex.update({ where: { slug }, data: { ...(data.name ? { name: data.name } : {}), ...(data.game ? { game: data.game } : {}), ...(data.status ? { status: data.status } : {}) } })
+    return new Pokedex({ id: row.id, slug: row.slug, name: row.name, game: row.game ?? undefined })
+  }
+
+  async removePokemon(slug: string, pokemonId: number): Promise<void> {
+    const pokedex = await prisma.pokedex.findUnique({ where: { slug } })
+    if (!pokedex) throw new Error('Pokedex not found')
+    await prisma.pokedexPokemon.deleteMany({ where: { pokedexId: pokedex.id, pokemonId } })
+  }
+
   async listPublished(): Promise<Pokedex[]> {
     const rows = await prisma.pokedex.findMany({ where: { status: 'published' } })
     return rows.map((r) => new Pokedex({ id: r.id, slug: r.slug, name: r.name, game: r.game ?? undefined }))

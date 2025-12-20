@@ -5,6 +5,7 @@ export type UserPokemonStatusProps = {
   has?: boolean
   shinyOnly?: boolean
   allForms?: boolean
+  seen?: boolean
 }
 
 export class UserPokemonStatus {
@@ -14,6 +15,7 @@ export class UserPokemonStatus {
   has: boolean
   shinyOnly: boolean
   allForms: boolean
+  seen: boolean
 
   constructor(props: UserPokemonStatusProps) {
     this.id = props.id
@@ -22,5 +24,6 @@ export class UserPokemonStatus {
     this.has = props.has ?? false
     this.shinyOnly = props.shinyOnly ?? false
     this.allForms = props.allForms ?? false
+    this.seen = props.seen ?? false
   }
 }

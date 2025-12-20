@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getToken } from 'next-auth/jwt'
 import { PrismaPokemonRepository } from '../../../src/infrastructure/repositories/PrismaPokemonRepository'
 import prisma from '../../../src/prisma/client'
 import { RegisterPokemon } from '../../../src/application/use-cases/registerPokemon'
@@ -30,8 +31,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'pokedex query required' }, { status: 400 })
   }
 
-  const list = await repo.findByPokedexSlug(slug)
-  return NextResponse.json(list)
+  const page = Number(urlObj.searchParams.get('page') || '1')
+  const perPage = Number(urlObj.searchParams.get('perPage') || '25')
+  const q = urlObj.searchParams.get('q') || undefined
+
+  const result = await repo.findByPokedexSlugPaged(slug, page, perPage, q)
+
+  // merge per-user statuses (has/seen) when user is authenticated
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+  const userId = token?.sub ? Number((token as any).sub) : undefined
+
+  let items = result.items
+  if (userId) {
+    const ids = items.map(i => i.id)
+    const statuses = await prisma.userPokemonStatus.findMany({ where: { userId, pokemonId: { in: ids } } })
+    const byId = Object.fromEntries(statuses.map(s => [s.pokemonId, s]))
+    items = items.map(i => {
+      const s = byId[i.id]
+      return { ...i, captured: s ? s.has ?? false : false, seen: s ? s.seen ?? false : false }
+    })
+  } else {
+    // unauthenticated: no per-user progress — treat as not captured and not seen
+    items = items.map(i => ({ ...i, captured: false, seen: false }))
+  }
+
+  return NextResponse.json({ items, total: result.total, page, perPage })
 }
 
 export async function POST(req: NextRequest) {

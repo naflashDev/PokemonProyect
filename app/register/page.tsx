@@ -1,7 +1,7 @@
 "use client"
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 
 export default function RegisterPage() {
   const [name, setName] = useState('')
@@ -18,8 +18,16 @@ export default function RegisterPage() {
       const j = await res.json()
       if (!res.ok) throw new Error(j.error || 'Error')
       setMessage('Registered — signing in...')
-      // attempt automatic sign in with credentials via redirect so cookies are set server-side
-      await signIn('credentials', { redirect: true, email, password, callbackUrl: '/admin' })
+      // Sign in without automatic redirect so we can route based on role
+      const res = await signIn('credentials', { redirect: false, email, password })
+      if (res?.error) {
+        setMessage('Error signing in: ' + String(res.error))
+        return
+      }
+      const session = await getSession()
+      const role = (session as any)?.user?.role ?? 'USER'
+      if (role === 'ADMIN') router.push('/admin')
+      else router.push('/')
     } catch (e:any) {
       setMessage('Error: ' + e.message)
     }

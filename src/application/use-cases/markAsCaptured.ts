@@ -3,14 +3,13 @@ import { IPokemonRepository } from "../../domain/repositories/IPokemonRepository
 export class MarkAsCaptured {
   constructor(private repo: IPokemonRepository) {}
 
-  async execute(pokemonId: number, shiny: boolean = false, complete: boolean = false) {
-    const p = await this.repo.findById(pokemonId)
-    if (!p) throw new Error('Pokemon not found')
+  // Marks (or unmarks) a pokemon as captured for a specific pokedex (per-pokedex status)
+  async execute(pokemonId: number, pokedexSlug: string, captured: boolean = true, shiny: boolean = false, complete: boolean = false) {
+    if (!pokedexSlug) throw new Error('pokedexSlug required')
 
-    p.captured = true
-    p.shiny = shiny
-    p.complete = complete
+    // persist per-pokedex status on the join table
+    await this.repo.updatePokedexPokemonStatus(pokedexSlug, pokemonId, captured, shiny, complete)
 
-    return this.repo.update(p)
+    return { pokemonId, pokedexSlug, captured, shiny, complete }
   }
 }

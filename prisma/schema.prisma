@@ -40,6 +40,12 @@ model PokedexPokemon {
   pokedexId Int
   pokemonId Int
 
+  // per-pokedex status (capture/shiny/complete)
+  captured  Boolean @default(false)
+  shiny     Boolean @default(false)
+  complete  Boolean @default(false)
+  createdAt DateTime @default(now())
+
   pokedex Pokedex @relation("Pokedex_PokedexPokemon", fields: [pokedexId], references: [id], onDelete: Cascade)
   pokemon Pokemon @relation("Pokemon_PokedexPokemon", fields: [pokemonId], references: [id], onDelete: Cascade)
 
@@ -64,6 +70,7 @@ model UserPokemonStatus {
   userId    Int
   pokemonId Int
   has       Boolean @default(false)
+  seen      Boolean @default(false)
   shinyOnly Boolean @default(false)
   allForms  Boolean @default(false)
 

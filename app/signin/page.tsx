@@ -1,6 +1,6 @@
 "use client"
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function SignInPage() {
@@ -12,8 +12,21 @@ export default function SignInPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setMessage('Signing in...')
-    // Use redirect so NextAuth performs full login flow and sets session cookie
-    await signIn('credentials', { redirect: true, email, password, callbackUrl: '/admin' })
+    // Sign in without automatic redirect so we can route based on role
+    const res = await signIn('credentials', { redirect: false, email, password })
+    if (res?.error) {
+      setMessage(String(res.error))
+      return
+    }
+
+    // Retrieve session to check role and redirect accordingly
+    const session = await getSession()
+    const role = (session as any)?.user?.role ?? 'USER'
+    if (role === 'ADMIN') {
+      router.push('/admin')
+    } else {
+      router.push('/')
+    }
   }
 
   return (

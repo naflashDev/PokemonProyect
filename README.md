@@ -29,6 +29,21 @@ npx prisma migrate dev --name init
 npm run dev
 ```
 
+### Tests
+
+- Run unit tests locally:
+
+```bash
+npm run test
+```
+
+- Integration tests are available under `test/integration` and are executed only when `RUN_INTEGRATION=1`.
+To run them locally (ensure your test database and migrations are applied):
+
+```bash
+npx cross-env RUN_INTEGRATION=1 npm run test:integration
+```
+
 2. Abre `http://localhost:3000`.
 
 Notas de diseño y próximos pasos

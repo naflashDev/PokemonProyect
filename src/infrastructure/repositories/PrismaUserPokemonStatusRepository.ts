@@ -9,14 +9,16 @@ export class PrismaUserPokemonStatusRepository implements IUserPokemonStatusRepo
       update: {
         has: status.has,
         shinyOnly: status.shinyOnly,
-        allForms: status.allForms
+        allForms: status.allForms,
+        seen: status.seen
       },
       create: {
         userId: status.userId,
         pokemonId: status.pokemonId,
         has: status.has,
         shinyOnly: status.shinyOnly,
-        allForms: status.allForms
+        allForms: status.allForms,
+        seen: status.seen
       }
     })
 
@@ -26,14 +28,41 @@ export class PrismaUserPokemonStatusRepository implements IUserPokemonStatusRepo
       pokemonId: row.pokemonId,
       has: row.has,
       shinyOnly: row.shinyOnly,
-      allForms: row.allForms
+      allForms: row.allForms,
+      seen: row.seen
     })
+  }
+
+  // Upsert allowing partial fields so callers can update only `has` or only `seen` without overwriting other fields.
+  async upsertPartial(userId: number, pokemonId: number, data: { has?: boolean; shinyOnly?: boolean; allForms?: boolean; seen?: boolean }): Promise<UserPokemonStatus> {
+    const createData: any = {
+      userId,
+      pokemonId,
+      has: data.has ?? false,
+      shinyOnly: data.shinyOnly ?? false,
+      allForms: data.allForms ?? false,
+      seen: data.seen ?? false
+    }
+
+    const updateData: any = {}
+    if (typeof data.has !== 'undefined') updateData.has = data.has
+    if (typeof data.shinyOnly !== 'undefined') updateData.shinyOnly = data.shinyOnly
+    if (typeof data.allForms !== 'undefined') updateData.allForms = data.allForms
+    if (typeof data.seen !== 'undefined') updateData.seen = data.seen
+
+    const row = await prisma.userPokemonStatus.upsert({
+      where: { userId_pokemonId: { userId, pokemonId } },
+      create: createData,
+      update: updateData
+    })
+
+    return new UserPokemonStatus({ id: row.id, userId: row.userId, pokemonId: row.pokemonId, has: row.has, shinyOnly: row.shinyOnly, allForms: row.allForms, seen: row.seen })
   }
 
   async findByUserAndPokemon(userId: number, pokemonId: number): Promise<UserPokemonStatus | null> {
     const row = await prisma.userPokemonStatus.findUnique({ where: { userId_pokemonId: { userId, pokemonId } } })
     if (!row) return null
-    return new UserPokemonStatus({ id: row.id, userId: row.userId, pokemonId: row.pokemonId, has: row.has, shinyOnly: row.shinyOnly, allForms: row.allForms })
+    return new UserPokemonStatus({ id: row.id, userId: row.userId, pokemonId: row.pokemonId, has: row.has, shinyOnly: row.shinyOnly, allForms: row.allForms, seen: row.seen })
   }
 
   async countCapturedByUserAndPokedex(userId: number, pokedexSlug: string): Promise<number> {
