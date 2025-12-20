@@ -18,62 +18,84 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
         }
         const data = Array.isArray(j) ? j : (j?.data ?? j?.results ?? [])
         const listData = Array.isArray(data) ? data : []
-        // merge persisted optimistic percents from localStorage and normalize progress shape
-        const merged = listData.map((px: any) => {
-          try {
-            const stored = localStorage.getItem(`pokedex-progress:${px.slug}`)
-            const percentFromStore = stored != null ? Number(stored) : undefined
-            const existingPercent = px?.progress && (typeof px.progress === 'number' ? px.progress : px.progress.percent)
-            const percent = typeof percentFromStore === 'number' && !Number.isNaN(percentFromStore) ? percentFromStore : (typeof existingPercent === 'number' ? existingPercent : 0)
-            return { ...px, progress: { percent: Math.max(0, Math.min(100, Number(percent || 0))) } }
-          } catch (_) {
-            return { ...px, progress: { percent: px?.progress?.percent ?? 0 } }
-          }
-        })
-        setList(merged)
+        setList(normalizeList(listData))
       })
       .catch((e: any) => setError(String(e)))
       .finally(() => setLoading(false))
   }, [])
 
+  function normalizeList(listData: any[]) {
+    return listData.map((px: any) => {
+      try {
+        const stored = localStorage.getItem(`pokedex-progress:${px.slug}`)
+        const percentFromStore = stored != null ? Number(stored) : undefined
+        const existingPercent = px?.progress && (typeof px.progress === 'number' ? px.progress : px.progress.percent)
+        const percent = typeof percentFromStore === 'number' && !Number.isNaN(percentFromStore) ? percentFromStore : (typeof existingPercent === 'number' ? existingPercent : 0)
+        return { ...px, progress: { percent: Math.max(0, Math.min(100, Number(percent || 0))) } }
+      } catch (_) {
+        return { ...px, progress: { percent: px?.progress?.percent ?? 0 } }
+      }
+    })
+  }
+
   useEffect(() => {
       const handler = (e: any) => {
-      // try to update locally when percent provided, otherwise refetch
-      const detail = e?.detail
-      console.log('[Page] received user-pokedex-changed', detail)
-      if (detail?.pokedex && typeof detail.percent === 'number') {
-        try { localStorage.setItem(`pokedex-progress:${detail.pokedex}`, String(detail.percent)) } catch (_) {}
-        setList(prev => prev.map(px => px.slug === detail.pokedex ? { ...px, progress: { percent: Math.max(0, Math.min(100, Number(detail.percent))) } } : px))
-        return
-      }
+        try {
+          const detail = e?.detail
+          console.log('[Page] received user-pokedex-changed', detail)
+          if (!detail || !detail.pokedex) return
 
-      // apply optimistic delta if provided (fallback when progress endpoint failed)
-      if (detail?.pokedex && typeof detail.deltaCaptured === 'number' && typeof detail.total === 'number') {
-        setList(prev => prev.map(px => {
-          if (px.slug !== detail.pokedex) return px
-          const prevPercent = Number(px.progress?.percent ?? 0)
-          const prevCount = Math.round((prevPercent / 100) * detail.total)
-          const newCount = prevCount + detail.deltaCaptured
-          const newPercent = detail.total === 0 ? 0 : Math.round((newCount / detail.total) * 100)
-          return { ...px, progress: { percent: Math.max(0, Math.min(100, newPercent)) } }
-        }))
-        return
-      }
-
-      setLoading(true)
-      fetch('/api/pokedexes', { credentials: 'include', cache: 'no-store' })
-        .then(async (r) => {
-          const j = await r.json().catch(() => null)
-          if (!r.ok) {
-            const msg = j?.error || j?.message || `HTTP ${r.status}`
-            throw new Error(msg)
+          // full percent update
+          if (typeof detail.percent === 'number') {
+            try { localStorage.setItem(`pokedex-progress:${detail.pokedex}`, String(detail.percent)) } catch (_) {}
+            const p = Math.max(0, Math.min(100, Number(detail.percent)))
+            setList(prev => prev.map(px => px.slug === detail.pokedex ? { ...px, progress: { percent: p } } : px))
+            if (selected) setSelectedPercent(detail.pokedex === selected ? p : selectedPercent)
+            return
           }
-          const data = Array.isArray(j) ? j : (j?.data ?? j?.results ?? [])
-          setList(Array.isArray(data) ? data : [])
-        })
-        .catch((e: any) => setError(String(e)))
-        .finally(() => setLoading(false))
-    }
+
+          // optimistic delta update when server didn't return full percent
+          if (typeof detail.deltaCaptured === 'number' && typeof detail.total === 'number') {
+            setList(prev => prev.map(px => {
+              if (px.slug !== detail.pokedex) return px
+              const cur = px?.progress && (typeof px.progress === 'number' ? px.progress : px.progress.percent)
+              const prevPercent = typeof cur === 'number' ? cur : 0
+              const prevCount = Math.round((prevPercent / 100) * detail.total)
+              const newCount = prevCount + detail.deltaCaptured
+              const newPercent = detail.total === 0 ? 0 : Math.round((newCount / detail.total) * 100)
+              return { ...px, progress: { percent: Math.max(0, Math.min(100, newPercent)) } }
+            }))
+            if (selected && detail.pokedex === selected) {
+              setSelectedPercent((s) => {
+                const prev = Number(s ?? 0)
+                const prevCount = Math.round((prev / 100) * detail.total)
+                const newCount = prevCount + detail.deltaCaptured
+                const newPercent = detail.total === 0 ? 0 : Math.round((newCount / detail.total) * 100)
+                return Math.max(0, Math.min(100, newPercent))
+              })
+            }
+            return
+          }
+
+          // fallback: refetch list and normalize
+          setLoading(true)
+          fetch('/api/pokedexes', { credentials: 'include', cache: 'no-store' })
+            .then(async (r) => {
+              const j = await r.json().catch(() => null)
+              if (!r.ok) {
+                const msg = j?.error || j?.message || `HTTP ${r.status}`
+                throw new Error(msg)
+              }
+              const data = Array.isArray(j) ? j : (j?.data ?? j?.results ?? [])
+              const listData = Array.isArray(data) ? data : []
+              setList(normalizeList(listData))
+            })
+            .catch((err: any) => setError(String(err)))
+            .finally(() => setLoading(false))
+        } catch (_) {
+          // ignore malformed events
+        }
+      }
 
     window.addEventListener('user-pokedex-changed', handler as EventListener)
     return () => window.removeEventListener('user-pokedex-changed', handler as EventListener)
