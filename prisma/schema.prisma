@@ -3,8 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Turso Cloud exposes a SQLite-compatible endpoint; switch provider to sqlite
+  provider = "sqlite"
+  // set TURSO_DATABASE_URL in your environment (see Turso dashboard for connection string)
+  url      = env("TURSO_DATABASE_URL")
 }
 
 model Pokedex {
