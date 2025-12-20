@@ -9,9 +9,9 @@ if (process.env.RUN_INTEGRATION === '1') {
       const repo = new PrismaUserPokemonStatusRepository()
       // This test will create the minimal fixtures it needs (user, pokedex, pokemon, join)
       const user = await prisma.user.create({ data: {} })
-      const pokedex = await prisma.pokedex.create({ data: { slug: 'national', name: 'National' } })
+      const pokedex = await prisma.pokedex.upsert({ where: { slug: 'national' }, update: {}, create: { slug: 'national', name: 'National' } })
       const pokemon = await prisma.pokemon.create({ data: { nationalId: 1, name: 'Testmon', types: 'normal', pokedexId: pokedex.id } })
-      await prisma.pokedexPokemon.create({ data: { pokedexId: pokedex.id, pokemonId: pokemon.id } })
+      await prisma.pokedexPokemon.upsert({ where: { pokedexId_pokemonId: { pokedexId: pokedex.id, pokemonId: pokemon.id } }, update: {}, create: { pokedexId: pokedex.id, pokemonId: pokemon.id } })
 
       const userId = user.id
       const pokemonId = pokemon.id
