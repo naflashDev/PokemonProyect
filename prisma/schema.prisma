@@ -3,14 +3,12 @@ generator client {
 }
 
 datasource db {
-  // Use sqlite provider for now to match the installed Prisma version.
-  // To enable Turso `libsql://` URLs you must upgrade Prisma to a version
-  // that supports the `libsql` provider and then set provider to "libsql".
-  provider = "sqlite"
-  // The URL should be provided via TURSO_DATABASE_URL (e.g. libsql://...)
-  // For local development create a `.env` with `TURSO_DATABASE_URL="file:./dev.db"`.
-  // Prisma env() accepts a single parameter in this Prisma CLI version.
-  url      = env("TURSO_DATABASE_URL")
+  // Use libsql provider to connect to Turso Cloud (libsql://... URLs).
+  // Ensure Prisma CLI/version supports `libsql` (we upgraded Prisma packages).
+  provider = "libsql"
+  // Provide the Turso connection string via `TURSO_DATABASE_URL`.
+  // For local development you can set `TURSO_DATABASE_URL=file:./dev.db` in .env
+  url = env("TURSO_DATABASE_URL")
 }
 
 model Pokedex {
