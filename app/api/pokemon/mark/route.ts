@@ -20,7 +20,17 @@ export async function POST(req: NextRequest) {
     if (typeof shiny !== 'undefined') data.shinyOnly = Boolean(shiny)
     if (typeof complete !== 'undefined') data.allForms = Boolean(complete)
 
+    // debug log: who is updating what
+    try {
+      console.log('[API][pokemon/mark] userId=%s pokemonId=%s data=%o', String(userId), String(pokemonId), data)
+    } catch (_) {}
+
     const updated = await repo.upsertPartial(userId, Number(pokemonId), data)
+
+    try {
+      console.log('[API][pokemon/mark] upsert result=%o', updated)
+    } catch (_) {}
+
     return NextResponse.json(updated)
   } catch (e:any) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

@@ -17,6 +17,11 @@ export async function GET(req: NextRequest) {
     const usecase = new GetPokedexProgress(repo)
     const progress = await usecase.execute(slug, userId)
 
+    // debug log to help diagnose why progress may be 0 for a logged user
+    try {
+      console.log('[API][pokedexes/progress] slug=%s userId=%s -> progress=%o', slug, String(userId), progress)
+    } catch (_) {}
+
     return NextResponse.json({ slug, progress })
   } catch (e:any) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

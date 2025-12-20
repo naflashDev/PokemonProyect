@@ -18,15 +18,17 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
         }
         const data = Array.isArray(j) ? j : (j?.data ?? j?.results ?? [])
         const listData = Array.isArray(data) ? data : []
-        // merge persisted optimistic percents from localStorage
+        // merge persisted optimistic percents from localStorage and normalize progress shape
         const merged = listData.map((px: any) => {
           try {
             const stored = localStorage.getItem(`pokedex-progress:${px.slug}`)
-            if (stored != null) {
-              return { ...px, progress: { ...(px.progress||{}), percent: Number(stored) } }
-            }
-          } catch (_) {}
-          return px
+            const percentFromStore = stored != null ? Number(stored) : undefined
+            const existingPercent = px?.progress && (typeof px.progress === 'number' ? px.progress : px.progress.percent)
+            const percent = typeof percentFromStore === 'number' && !Number.isNaN(percentFromStore) ? percentFromStore : (typeof existingPercent === 'number' ? existingPercent : 0)
+            return { ...px, progress: { percent: Math.max(0, Math.min(100, Number(percent || 0))) } }
+          } catch (_) {
+            return { ...px, progress: { percent: px?.progress?.percent ?? 0 } }
+          }
         })
         setList(merged)
       })
@@ -35,13 +37,13 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
   }, [])
 
   useEffect(() => {
-    const handler = (e: any) => {
+      const handler = (e: any) => {
       // try to update locally when percent provided, otherwise refetch
       const detail = e?.detail
       console.log('[Page] received user-pokedex-changed', detail)
       if (detail?.pokedex && typeof detail.percent === 'number') {
         try { localStorage.setItem(`pokedex-progress:${detail.pokedex}`, String(detail.percent)) } catch (_) {}
-        setList(prev => prev.map(px => px.slug === detail.pokedex ? { ...px, progress: { ...(px.progress||{}), percent: detail.percent } } : px))
+        setList(prev => prev.map(px => px.slug === detail.pokedex ? { ...px, progress: { percent: Math.max(0, Math.min(100, Number(detail.percent))) } } : px))
         return
       }
 
@@ -53,7 +55,7 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
           const prevCount = Math.round((prevPercent / 100) * detail.total)
           const newCount = prevCount + detail.deltaCaptured
           const newPercent = detail.total === 0 ? 0 : Math.round((newCount / detail.total) * 100)
-          return { ...px, progress: { ...(px.progress||{}), percent: Math.max(0, Math.min(100, newPercent)) } }
+          return { ...px, progress: { percent: Math.max(0, Math.min(100, newPercent)) } }
         }))
         return
       }
@@ -158,6 +160,13 @@ export default function Page() {
     window.addEventListener('user-pokedex-changed', handler as EventListener)
     return () => window.removeEventListener('user-pokedex-changed', handler as EventListener)
   }, [selected])
+
+  // persist and log selectedPercent changes for debugging
+  useEffect(() => {
+    console.log('[Page] selectedPercent changed', { selected, selectedPercent })
+    if (!selected) return
+    try { localStorage.setItem(`pokedex-progress:${selected}`, String(selectedPercent ?? 0)) } catch (_) {}
+  }, [selectedPercent, selected])
 
   return (
     <div className="space-y-6">

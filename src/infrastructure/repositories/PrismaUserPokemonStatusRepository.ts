@@ -66,7 +66,22 @@ export class PrismaUserPokemonStatusRepository implements IUserPokemonStatusRepo
   }
 
   async countCapturedByUserAndPokedex(userId: number, pokedexSlug: string): Promise<number> {
-    const count = await prisma.userPokemonStatus.count({ where: { userId, pokemon: { pokedex: { slug: pokedexSlug } }, has: true } })
+    // The project stores per-pokedex membership in the PokedexPokemon join table.
+    // Counting captured statuses must consider that a Pokemon may be linked to a Pokedex
+    // via the join table rather than the Pokemon.pokedex relation. Use a relation
+    // filter through `pokemon.pokedexPokemons` to ensure we count correctly.
+    const count = await prisma.userPokemonStatus.count({
+      where: {
+        userId,
+        has: true,
+        pokemon: {
+          pokedexPokemons: {
+            some: { pokedex: { slug: pokedexSlug } }
+          }
+        }
+      }
+    })
+
     return count
   }
 
