@@ -19,9 +19,9 @@ export default function RegisterPage() {
       if (!res.ok) throw new Error(j.error || 'Error')
       setMessage('Registered — signing in...')
       // Sign in without automatic redirect so we can route based on role
-      const res = await signIn('credentials', { redirect: false, email, password })
-      if (res?.error) {
-        setMessage('Error signing in: ' + String(res.error))
+      const signInRes = await signIn('credentials', { redirect: false, email, password })
+      if (signInRes?.error) {
+        setMessage('Error signing in: ' + String(signInRes.error))
         return
       }
       const session = await getSession()
