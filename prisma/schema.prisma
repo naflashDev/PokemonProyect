@@ -8,8 +8,9 @@ datasource db {
   // that supports the `libsql` provider and then set provider to "libsql".
   provider = "sqlite"
   // The URL should be provided via TURSO_DATABASE_URL (e.g. libsql://...)
-  // For local development you may set TURSO_DATABASE_URL="file:./dev.db".
-  url      = env("TURSO_DATABASE_URL", "file:./dev.db")
+  // For local development create a `.env` with `TURSO_DATABASE_URL="file:./dev.db"`.
+  // Prisma env() accepts a single parameter in this Prisma CLI version.
+  url      = env("TURSO_DATABASE_URL")
 }
 
 model Pokedex {
