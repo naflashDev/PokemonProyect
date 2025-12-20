@@ -1,72 +1,16 @@
+import prisma from '../src/prisma/client'
+
 async function main() {
-  console.log('Running seed...')
-
-  // dynamic import to work with ts-node ESM/CJS interop
-  let prismaModule: any
-  try {
-    prismaModule = await import('../src/prisma/client')
-  } catch (e1) {
-    try {
-      prismaModule = await import('../src/prisma/client.js')
-    } catch (e2) {
-      throw new Error('Could not import prisma client from ../src/prisma/client(.js)')
-    }
-  }
-  const prisma = prismaModule.default || prismaModule.prisma || prismaModule
-
-  const adminEmail = 'admin@example.com'
-
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { role: 'ADMIN', name: 'Admin' },
-    create: { email: adminEmail, name: 'Admin', role: 'ADMIN' }
-  })
-
-  console.log('Admin user ensured:', admin.email)
-
-  const kanto = await prisma.pokedex.upsert({
-    where: { slug: 'kanto' },
-    update: {},
-    create: { slug: 'kanto', name: 'Kanto', game: 'Red/Blue', status: 'published' }
-  })
-
-  const pokemons = [
-    { nationalId: 1, name: 'Bulbasaur', types: 'Grass,Poison', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png' },
-    { nationalId: 4, name: 'Charmander', types: 'Fire', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png' },
-    { nationalId: 7, name: 'Squirtle', types: 'Water', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png' }
-  ]
-
-  for (const p of pokemons) {
-    await prisma.pokemon.upsert({
-      where: { id: -1 }, // force create by using non-existing where (Prisma doesn't allow composite upsert by fields easily)
-      create: {
-        nationalId: p.nationalId,
-        name: p.name,
-        types: p.types,
-        imageUrl: p.imageUrl,
-        pokedexId: kanto.id
-      },
-      update: {}
-    }).catch(async (e: any) => {
-      // fallback to create if upsert with fake where fails
-      await prisma.pokemon.create({ data: { nationalId: p.nationalId, name: p.name, types: p.types, imageUrl: p.imageUrl, pokedexId: kanto.id } })
-    })
-  }
-
-  console.log('Seed finished')
+  // Do not create any fixtures here. This seed script intentionally
+  // only ensures the Prisma client can connect and disconnect. Use
+  // `npx prisma db push` or `npx prisma migrate dev` to apply schema.
+  console.log('Seed: connecting to database (no fixtures will be created)')
+  await prisma.$connect()
+  await prisma.$disconnect()
+  console.log('Seed finished (no data created)')
 }
 
-main()
-  .catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    try {
-      const prismaModule = await import('../src/prisma/client')
-      const prisma = prismaModule.default || (prismaModule as any)
-      await prisma.$disconnect()
-    } catch (e) {
-      // ignore
-    }
-  })
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})
