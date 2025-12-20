@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { PrismaUserPokemonStatusRepository } from '../../../../src/infrastructure/repositories/PrismaUserPokemonStatusRepository'
+import prisma from '../../../../src/prisma/client'
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,9 +27,29 @@ export async function POST(req: NextRequest) {
         const cookieValue = possibleNames.map(n => cookieMap[n]).find(Boolean)
         try { console.log('[API][pokemon/mark] parsed cookie names present:', possibleNames.map(n => !!cookieMap[n])) } catch (_) {}
         if (cookieValue) {
-          // getToken can accept a raw token in some environments; use `as any` to be tolerant
-          token = await getToken({ token: cookieValue, secret: process.env.NEXTAUTH_SECRET } as any)
-          try { console.log('[API][pokemon/mark] token from cookie fallback present? ', !!token) } catch (_) {}
+          // attempt to fetch session from our own session endpoint using the cookie
+          try {
+            const sessionUrl = process.env.NEXTAUTH_URL ? new URL('/api/auth/session', process.env.NEXTAUTH_URL).toString() : undefined
+            if (sessionUrl) {
+              const sr = await fetch(sessionUrl, { headers: { cookie: cookieHeader } })
+              const sj = await sr.json()
+              try { console.log('[API][pokemon/mark] session fetch status:', sr.status, 'body:', sj) } catch (_) {}
+              if (sj?.user?.email) {
+                const dbUser = await prisma.user.findUnique({ where: { email: sj.user.email } })
+                if (dbUser) {
+                  try { console.log('[API][pokemon/mark] resolved userId from session email:', dbUser.id) } catch (_) {}
+                  // set userId for downstream logic
+                  // NOTE: we won't set `token`, but we can use `dbUser.id` as the authenticated id
+                  // by overriding userId below after this block.
+                  req = Object.assign(req, { __resolvedUserId: dbUser.id }) as NextRequest
+                }
+              }
+            } else {
+              try { console.log('[API][pokemon/mark] NEXTAUTH_URL not set; cannot fetch /api/auth/session') } catch (_) {}
+            }
+          } catch (e) {
+            try { console.log('[API][pokemon/mark] session fetch error:', String(e)) } catch (_) {}
+          }
         } else {
           try { console.log('[API][pokemon/mark] no session cookie found in header') } catch (_) {}
         }
@@ -36,7 +57,10 @@ export async function POST(req: NextRequest) {
         try { console.log('[API][pokemon/mark] getToken fallback error:', String(err)) } catch (_) {}
       }
     }
-    const userId = token?.sub ? Number((token as any).sub) : undefined
+
+    // if we resolved a user id via session fetch, prefer it
+    let resolvedUserId = (req as any).__resolvedUserId as number | undefined
+    let userId = resolvedUserId ?? (token?.sub ? Number((token as any).sub) : undefined)
     if (!userId) return NextResponse.json({ error: 'authentication required' }, { status: 401 })
 
     const repo = new PrismaUserPokemonStatusRepository()
