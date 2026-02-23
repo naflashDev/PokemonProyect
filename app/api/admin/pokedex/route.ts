@@ -9,50 +9,63 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const parsed = createSchema.parse(body)
+
     const repo = new PrismaPokedexRepository()
+
+    // prevent duplicate slugs with explicit check to return a friendly error
+    const exists = await repo.findBySlug(parsed.slug)
+    if (exists) return NextResponse.json({ error: 'slug already exists' }, { status: 409 })
+
     const usecase = new CreatePokedex(repo)
-    const created = await usecase.execute(parsed)
+    let created
+    try {
+      created = await usecase.execute(parsed)
+    } catch (e:any) {
+      console.error('create pokedex error', e)
+      return NextResponse.json({ error: e?.message || String(e) }, { status: 500 })
+    }
+
     // If initial pokemon names provided, attach existing pokemons to this pokedex
     if (parsed.initialPokemonNames && parsed.initialPokemonNames.length > 0) {
       try {
-        // use prisma directly for bulk update
         const prisma = (await import('../../../../src/prisma/client')).default
         const p = await prisma.pokedex.findUnique({ where: { slug: parsed.slug } })
         if (p) {
-          // For each named pokemon, create a link in PokedexPokemon instead of moving pokedexId.
-          const pokemons = await prisma.pokemon.findMany({ where: { name: { in: parsed.initialPokemonNames } } })
-          for (const pk of pokemons) {
-            const exists = await prisma.pokedexPokemon.findFirst({ where: { pokedexId: p.id, pokemonId: pk.id } })
-            if (!exists) {
-              await prisma.pokedexPokemon.create({ data: { pokedexId: p.id, pokemonId: pk.id } })
-            }
+          const pokemons = await prisma.pokemon.findMany({ where: { name: { in: parsed.initialPokemonNames } }, select: { id: true } })
+          if (pokemons.length > 0) {
+            const data = pokemons.map((pk: any) => ({ pokedexId: p.id, pokemonId: pk.id }))
+            // skipDuplicates avoids unique constraint failures
+            await prisma.pokedexPokemon.createMany({ data, skipDuplicates: true })
           }
         }
       } catch (e) {
-        // non-fatal
-        console.warn('Failed to attach initial pokemon names', e)
+        // non-fatal: creation succeeded but initial attach failed
+        console.error('attach initial pokemons failed', e)
       }
     }
-    return NextResponse.json(created, { status: 201 })
+
+    return NextResponse.json({ slug: created.slug, id: created.id })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 })
+    return NextResponse.json({ error: err?.message || String(err) }, { status: 400 })
   }
 }
 
-const patchSchema = z.object({ action: z.string(), slug: z.string(), name: z.string().optional(), game: z.string().optional(), pokemonId: z.number().optional(), status: z.string().optional() })
+const patchSchema = z.object({ action: z.string(), slug: z.string().min(1), name: z.string().optional(), game: z.string().optional(), status: z.string().optional(), pokemonId: z.number().optional() })
+
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
     const parsed = patchSchema.parse(body)
     const repo = new PrismaPokedexRepository()
+
     if (parsed.action === 'publish') {
-      const updated = await repo.publish(parsed.slug)
-      return NextResponse.json(updated)
+      const p = await repo.publish(parsed.slug)
+      return NextResponse.json({ ok: true, slug: p.slug })
     }
 
     if (parsed.action === 'update') {
-      const updated = await repo.update(parsed.slug, { name: parsed.name, game: parsed.game, status: parsed.status })
-      return NextResponse.json(updated)
+      const p = await repo.update(parsed.slug, { name: parsed.name, game: parsed.game, status: parsed.status })
+      return NextResponse.json({ ok: true, slug: p.slug })
     }
 
     if (parsed.action === 'removePokemon') {
@@ -66,3 +79,4 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 400 })
   }
 }
+

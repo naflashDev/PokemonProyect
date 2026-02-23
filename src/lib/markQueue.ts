@@ -39,9 +39,21 @@ export async function flushQueue() {
     const j = await res.json().catch(() => null)
     // server returns progress per pokedex: [{ pokedex, percent, captured, total }]
     const progress = Array.isArray(j?.progress) ? j.progress : []
+    // map progress by pokedex for easy lookup
+    const progressByPokedex = progress.reduce((acc: Record<string, any>, p: any) => { acc[p.pokedex] = p; return acc }, {})
+    // dispatch progress events
     for (const p of progress) {
       try { localStorage.setItem(`pokedex-progress:${p.pokedex}`, String(p.percent)) } catch (_) {}
       try { window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: p.pokedex, percent: p.percent } })) } catch (_) {}
+    }
+    // always emit an invalidate event per pokedex seen in payload so views can refetch authoritative rows
+    const pokedexes = Array.from(new Set(payload.map(i => i.pokedex).filter(Boolean)))
+    for (const slug of pokedexes) {
+      const p = progressByPokedex[slug]
+      const detail: any = { pokedex: slug }
+      if (p && typeof p.percent === 'number') detail.percent = p.percent
+      else detail.invalidate = true
+      try { window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail })) } catch (_) {}
     }
     return j
   } catch (err) {

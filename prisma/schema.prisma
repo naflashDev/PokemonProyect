@@ -3,22 +3,21 @@ generator client {
 }
 
 datasource db {
-  // Use libsql provider to connect to Turso Cloud (libsql://... URLs).
-  // Ensure Prisma CLI/version supports `libsql` (we upgraded Prisma packages).
-  provider = "libsql"
-  // Provide the Turso connection string via `TURSO_DATABASE_URL`.
-  // For local development you can set `TURSO_DATABASE_URL=file:./dev.db` in .env
-  url = env("TURSO_DATABASE_URL")
+  // Use SQLite for local development with Prisma. Set `DATABASE_URL` in .env
+  // Example: DATABASE_URL="file:./dev.db"
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model Pokedex {
-  id              Int              @id @default(autoincrement())
-  slug            String           @unique
-  name            String
-  game            String?
-  status          String           @default("draft") // draft | published
-  pokemons        Pokemon[]
-  pokedexPokemons PokedexPokemon[] @relation("Pokedex_PokedexPokemon")
+  id                  Int                 @id @default(autoincrement())
+  slug                String              @unique
+  name                String
+  game                String?
+  status              String              @default("draft") // draft | published
+  pokemons            Pokemon[]
+  pokedexPokemons     PokedexPokemon[]    @relation("Pokedex_PokedexPokemon")
+  userPokemonStatuses UserPokemonStatus[]
 }
 
 model Pokemon {
@@ -45,9 +44,9 @@ model PokedexPokemon {
   pokemonId Int
 
   // per-pokedex status (capture/shiny/complete)
-  captured  Boolean @default(false)
-  shiny     Boolean @default(false)
-  complete  Boolean @default(false)
+  captured  Boolean  @default(false)
+  shiny     Boolean  @default(false)
+  complete  Boolean  @default(false)
   createdAt DateTime @default(now())
 
   pokedex Pokedex @relation("Pokedex_PokedexPokemon", fields: [pokedexId], references: [id], onDelete: Cascade)
@@ -73,15 +72,17 @@ model UserPokemonStatus {
   id        Int     @id @default(autoincrement())
   userId    Int
   pokemonId Int
+  pokedexId Int?
   has       Boolean @default(false)
   seen      Boolean @default(false)
   shinyOnly Boolean @default(false)
   allForms  Boolean @default(false)
 
-  user    User    @relation(fields: [userId], references: [id])
-  pokemon Pokemon @relation(fields: [pokemonId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  pokemon Pokemon  @relation(fields: [pokemonId], references: [id])
+  pokedex Pokedex? @relation(fields: [pokedexId], references: [id])
 
-  @@unique([userId, pokemonId])
+  @@unique([userId, pokemonId, pokedexId])
 }
 
 /// Models required by NextAuth (Accounts, Sessions, VerificationTokens)

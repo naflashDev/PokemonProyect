@@ -11,7 +11,22 @@ export async function GET(req: NextRequest) {
     if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 })
 
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
-    const userId = token?.sub ? Number((token as any).sub) : undefined
+    // Resolve userId from token or, as a fallback, try to fetch session using the incoming cookie
+    let userId = token?.sub ? Number((token as any).sub) : undefined
+    if (!userId) {
+      try {
+        const cookieHeader = req.headers.get('cookie') || ''
+        const sessionUrl = process.env.NEXTAUTH_URL ? new URL('/api/auth/session', process.env.NEXTAUTH_URL).toString() : undefined
+        if (sessionUrl) {
+          const sr = await fetch(sessionUrl, { headers: { cookie: cookieHeader } })
+          const sj = await sr.json().catch(() => null)
+          if (sj?.user?.email) {
+            const dbUser = await prisma.user.findUnique({ where: { email: sj.user.email } })
+            if (dbUser) userId = dbUser.id
+          }
+        }
+      } catch (_) {}
+    }
 
     const repo = new PrismaPokemonRepository()
     const usecase = new GetPokedexProgress(repo)

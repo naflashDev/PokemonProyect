@@ -13,12 +13,12 @@ export default function AuthHeader() {
       {session?.user ? (
         <>
           <div className="text-sm text-gray-200">{session.user.name ?? session.user.email} <span className="text-xs text-gray-400">{(session as any).user?.role ?? ''}</span></div>
-          <button onClick={() => signOut()} className="px-3 py-1 bg-red-600 rounded text-sm">Sign out</button>
+          <button onClick={() => signOut()} className="px-3 py-1.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-300">Sign out</button>
         </>
       ) : (
         <>
-          <Link href="/signin" className="px-3 py-1 bg-green-600 rounded text-sm">Sign in</Link>
-          <Link href="/register" className="px-3 py-1 bg-slate-700 rounded text-sm">Register</Link>
+          <Link href="/signin" className="px-3 py-1.5 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-300">Sign in</Link>
+          <Link href="/register" className="px-3 py-1.5 rounded-md text-sm font-medium bg-slate-700 text-white hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300">Register</Link>
         </>
       )}
     </div>

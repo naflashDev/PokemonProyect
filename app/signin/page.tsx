@@ -36,8 +36,8 @@ export default function SignInPage() {
         <input className="w-full p-2 rounded mb-2 bg-gray-800 text-white" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input type="password" className="w-full p-2 rounded mb-4 bg-gray-800 text-white" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-green-600 rounded" type="submit">Sign in</button>
-          <a href="/register" className="px-4 py-2 bg-slate-700 rounded">Register</a>
+          <button className="px-4 py-2 bg-green-600 text-white rounded" type="submit">Sign in</button>
+          <a href="/register" className="px-4 py-2 bg-slate-700 text-white rounded">Register</a>
         </div>
         {message && <div className="mt-3 text-sm">{message}</div>}
       </form>

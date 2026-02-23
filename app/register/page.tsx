@@ -41,8 +41,8 @@ export default function RegisterPage() {
         <input className="w-full p-2 rounded mb-2 bg-gray-800 text-white" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input type="password" className="w-full p-2 rounded mb-4 bg-gray-800 text-white" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-green-600 rounded" type="submit">Create account</button>
-          <a href="/api/auth/signin" className="px-4 py-2 bg-slate-700 rounded">Sign in</a>
+          <button className="px-4 py-2 bg-green-600 text-white rounded" type="submit">Create account</button>
+          <a href="/api/auth/signin" className="px-4 py-2 bg-slate-700 text-white rounded">Sign in</a>
         </div>
         {message && <div className="mt-3 text-sm">{message}</div>}
       </form>

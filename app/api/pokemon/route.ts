@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
   let items = result.items
   if (userId) {
     const ids = items.map(i => i.id).filter((v): v is number => typeof v === 'number')
-    const statuses = await prisma.userPokemonStatus.findMany({ where: { userId, pokemonId: { in: ids } } })
+    // Only load per-user statuses that belong to the current pokedex (avoid applying statuses from other pokedexes)
+    const statuses = await prisma.userPokemonStatus.findMany({ where: { userId, pokemonId: { in: ids }, pokedex: { slug } } })
     const byId = Object.fromEntries(statuses.map(s => [s.pokemonId, s])) as Record<number, typeof statuses[0]>
     items = items.map(i => {
       if (typeof i.id !== 'number') return { ...i, captured: false, seen: false }

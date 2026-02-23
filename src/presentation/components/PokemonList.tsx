@@ -62,6 +62,40 @@ export default function PokemonList({ pokedexSlug, onProgressUpdate }: { pokedex
       .finally(() => setLoading(false))
   }, [pokedexSlug, page, q])
 
+  // listen for global user-pokedex-changed events and refetch if this pokedex was invalidated
+  useEffect(() => {
+    const handler = (e: any) => {
+      try {
+        const d = e?.detail
+        if (!d || d.pokedex !== pokedexSlug) return
+        // if server provided authoritative percent update, update progress via prop
+        if (typeof d.percent === 'number') {
+          try { onProgressUpdate?.(d.percent) } catch (_) {}
+        }
+        // if invalidation requested, reload current page of items
+        if (d.invalidate) {
+          setLoading(true)
+          const params = new URLSearchParams()
+          params.set('pokedex', pokedexSlug)
+          params.set('page', String(page))
+          params.set('perPage', String(perPage))
+          if (q.trim()) params.set('q', q.trim())
+          fetch(`/api/pokemon?${params.toString()}`, { credentials: 'include' })
+            .then(async (r) => r.json().catch(() => ({ items: [], total: 0 })))
+            .then((data) => {
+              setItems((data as any).items ?? [])
+              setTotal(Number((data as any).total || 0))
+            })
+            .catch((e) => console.error('Error reloading pokemons after invalidate', e))
+            .finally(() => setLoading(false))
+        }
+      } catch (_) {}
+    }
+
+    window.addEventListener('user-pokedex-changed', handler as EventListener)
+    return () => window.removeEventListener('user-pokedex-changed', handler as EventListener)
+  }, [pokedexSlug, page, perPage, q, onProgressUpdate])
+
   
 
   async function markCaptured(pokemonId: number) {
@@ -76,7 +110,12 @@ export default function PokemonList({ pokedexSlug, onProgressUpdate }: { pokedex
       try {
         const capturedCount = updated.filter(i => i.captured).length
         const percentOptimistic = total === 0 ? 0 : Math.round((capturedCount / total) * 100)
-        try { localStorage.setItem(`pokedex-progress:${pokedexSlug}`, String(percentOptimistic)) } catch (_) {}
+        try {
+          // keep the highest known progress to avoid accidental overwrite by stale server responses
+          const existing = Number(localStorage.getItem(`pokedex-progress:${pokedexSlug}`) || 0)
+          const toStore = Math.max(existing || 0, percentOptimistic)
+          localStorage.setItem(`pokedex-progress:${pokedexSlug}`, String(toStore))
+        } catch (_) {}
         window.dispatchEvent(new CustomEvent('user-pokedex-changed', { detail: { pokedex: pokedexSlug, percent: percentOptimistic } }))
         try { onProgressUpdate?.(percentOptimistic) } catch (_) {}
       } catch (_) {}
@@ -113,7 +152,7 @@ export default function PokemonList({ pokedexSlug, onProgressUpdate }: { pokedex
       {!loading && (
         <ul className="grid grid-cols-5 gap-4">
           {items.map((p) => (
-            <li key={p.id} className="bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition p-4 rounded-lg flex flex-col">
+            <li key={p.id} className="card hover:shadow-md transition p-4 flex flex-col">
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center overflow-hidden">
                   {/* placeholder for image if available */}
@@ -132,8 +171,8 @@ export default function PokemonList({ pokedexSlug, onProgressUpdate }: { pokedex
                   {(p.seen ?? false) ? <span className="text-indigo-600 font-medium">Visto</span> : <span className="text-gray-500">No visto</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => markCaptured(p.id)} className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">{p.captured ? 'Desmarcar' : 'Marcar capturado'}</button>
-                  <button onClick={() => toggleSeen(p.id)} className="px-3 py-1 bg-gray-200 rounded">{(p.seen ?? false) ? 'Marcar no visto' : 'Marcar visto'}</button>
+                  <button onClick={() => markCaptured(p.id)} className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-300">{p.captured ? 'Desmarcar' : 'Marcar capturado'}</button>
+                  <button onClick={() => toggleSeen(p.id)} className="px-3 py-1.5 rounded-md text-sm font-medium bg-slate-200 text-gray-900 dark:bg-slate-700 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300">{(p.seen ?? false) ? 'Marcar no visto' : 'Marcar visto'}</button>
                 </div>
               </div>
             </li>
@@ -145,8 +184,8 @@ export default function PokemonList({ pokedexSlug, onProgressUpdate }: { pokedex
       <div className="mt-4 flex items-center justify-between">
         <div className="text-sm text-gray-600">Mostrando {(page-1)*perPage+1} - {Math.min(page*perPage, total)} de {total}</div>
         <div className="flex items-center gap-2">
-          <button disabled={page<=1} onClick={() => setPage(p => Math.max(1, p-1))} className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Anterior</button>
-          <button disabled={page*perPage>=total} onClick={() => setPage(p => p+1)} className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Siguiente</button>
+          <button disabled={page<=1} onClick={() => setPage(p => Math.max(1, p-1))} className="px-3 py-1.5 rounded-md text-sm font-medium bg-slate-200 text-gray-900 dark:bg-slate-700 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300">Anterior</button>
+          <button disabled={page*perPage>=total} onClick={() => setPage(p => p+1)} className="px-3 py-1.5 rounded-md text-sm font-medium bg-slate-200 text-gray-900 dark:bg-slate-700 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300">Siguiente</button>
         </div>
       </div>
     </div>

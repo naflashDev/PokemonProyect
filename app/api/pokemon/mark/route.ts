@@ -6,7 +6,7 @@ import prisma from '../../../../src/prisma/client'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { pokemonId, captured, seen, shiny, complete } = body
+    const { pokemonId, captured, seen, shiny, complete, pokedex } = body
     if (!pokemonId) return NextResponse.json({ error: 'pokemonId required' }, { status: 400 })
 
     // require authentication to write per-user statuses
@@ -75,13 +75,23 @@ export async function POST(req: NextRequest) {
       console.log('[API][pokemon/mark] userId=%s pokemonId=%s data=%o', String(userId), String(pokemonId), data)
     } catch (_) {}
 
-    const updated = await repo.upsertPartial(userId, Number(pokemonId), data)
+    // resolve optional pokedex id
+    let pokedexId: number | null = null
+    try {
+      if (pokedex) {
+        const pd = await prisma.pokedex.findUnique({ where: { slug: String(pokedex) } })
+        if (pd) pokedexId = pd.id
+      }
+    } catch (_) { pokedexId = null }
 
     try {
-      console.log('[API][pokemon/mark] upsert result=%o', updated)
-    } catch (_) {}
-
-    return NextResponse.json(updated)
+      const updated = await repo.upsertPartial(userId, Number(pokemonId), data, pokedexId)
+      try { console.log('[API][pokemon/mark] upsert result=%o', updated) } catch (_) {}
+      return NextResponse.json(updated)
+    } catch (err:any) {
+      console.error('upsertPartial failed for single mark', err, { userId, pokemonId, pokedexId, data })
+      return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
   } catch (e:any) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }

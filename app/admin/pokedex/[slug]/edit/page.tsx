@@ -1,11 +1,11 @@
-"use client"
+﻿"use client"
 import React, { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 
-export default function EditPokedexPage() {
+export default function Page() {
   const router = useRouter()
-  const params = useParams() as { slug: string }
-  const slug = params.slug
+  const params = useParams() as { slug?: string }
+  const slug = params?.slug || ''
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
   const [game, setGame] = useState('')
@@ -14,20 +14,24 @@ export default function EditPokedexPage() {
   const [msg, setMsg] = useState('')
 
   useEffect(() => {
+    if (!slug) return setLoading(false)
+    let mounted = true
     async function load() {
       setLoading(true)
       try {
         const r = await fetch(`/api/admin/pokedex/${encodeURIComponent(slug)}`, { credentials: 'include' })
         const j = await r.json()
         if (!r.ok) { setMsg('Error: ' + (j.error || r.status)); return }
+        if (!mounted) return
         setName(j.name || '')
         setGame(j.game || '')
         setStatus(j.status || 'draft')
         setPokemons(j.pokemons || [])
-      } catch (e:any) { setMsg(String(e)) }
-      finally { setLoading(false) }
+      } catch (e:any) { if (mounted) setMsg(String(e)) }
+      finally { if (mounted) setLoading(false) }
     }
     load()
+    return () => { mounted = false }
   }, [slug])
 
   async function save() {
@@ -37,7 +41,8 @@ export default function EditPokedexPage() {
       const j = await r.json()
       if (!r.ok) throw new Error(j.error || 'Error')
       setMsg('Guardado')
-    } catch (e:any) { setMsg('Error: ' + e.message) }
+      try { window.dispatchEvent(new CustomEvent('pokedex-changed', { detail: { action: 'updated', slug } })) } catch (_) {}
+    } catch (e:any) { setMsg('Error: ' + (e?.message || String(e))) }
   }
 
   async function removePokemon(pokemonId: number) {
@@ -47,9 +52,10 @@ export default function EditPokedexPage() {
       const r = await fetch('/api/admin/pokedex', { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'removePokemon', slug, pokemonId }) })
       const j = await r.json()
       if (!r.ok) throw new Error(j.error || 'Error')
-      setPokemons(pokemons.filter(p => p.id !== pokemonId))
+      setPokemons(prev => prev.filter(p => p.id !== pokemonId))
       setMsg('Eliminado')
-    } catch (e:any) { setMsg('Error: ' + e.message) }
+      try { window.dispatchEvent(new CustomEvent('pokedex-changed', { detail: { action: 'updated', slug } })) } catch (_) {}
+    } catch (e:any) { setMsg('Error: ' + (e?.message || String(e))) }
   }
 
   if (loading) return <div>Cargando...</div>
@@ -65,8 +71,8 @@ export default function EditPokedexPage() {
           <option value="published">Published</option>
         </select>
         <div className="flex gap-2">
-          <button onClick={save} className="px-3 py-1 bg-blue-600 rounded">Guardar</button>
-          <button onClick={() => router.push('/admin')} className="px-3 py-1 bg-gray-600 rounded">Volver</button>
+          <button onClick={save} className="px-3 py-1 bg-blue-600 text-white rounded">Guardar</button>
+          <button onClick={() => router.push('/admin')} className="px-3 py-1 bg-gray-600 text-white rounded">Volver</button>
         </div>
         {msg && <div className="text-sm mt-2">{msg}</div>}
       </div>

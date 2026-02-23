@@ -30,7 +30,11 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
         const stored = localStorage.getItem(`pokedex-progress:${px.slug}`)
         const percentFromStore = stored != null ? Number(stored) : undefined
         const existingPercent = px?.progress && (typeof px.progress === 'number' ? px.progress : px.progress.percent)
-        const percent = typeof percentFromStore === 'number' && !Number.isNaN(percentFromStore) ? percentFromStore : (typeof existingPercent === 'number' ? existingPercent : 0)
+        // Prefer optimistic local progress when it's greater than server-reported progress
+        const candidateServer = typeof existingPercent === 'number' && !Number.isNaN(existingPercent) ? existingPercent : undefined
+        const candidateStore = typeof percentFromStore === 'number' && !Number.isNaN(percentFromStore) ? percentFromStore : undefined
+        // Prefer authoritative server value when available; otherwise use optimistic local store
+        const percent = typeof candidateServer !== 'undefined' ? candidateServer : (candidateStore ?? 0)
         return { ...px, progress: { percent: Math.max(0, Math.min(100, Number(percent || 0))) } }
       } catch (_) {
         return { ...px, progress: { percent: px?.progress?.percent ?? 0 } }
@@ -91,24 +95,33 @@ function PokedexCards({ onSelect }: { onSelect: (slug: string) => void }) {
     return () => window.removeEventListener('user-pokedex-changed', handler as EventListener)
   }, [])
 
+  // reload the pokedex list when admin creates/updates/deletes a pokedex
+  useEffect(() => {
+    const onPokedexChanged = (_e: any) => {
+      try { setLoading(true); load() } catch (_) { setLoading(false) }
+    }
+    window.addEventListener('pokedex-changed', onPokedexChanged as EventListener)
+    return () => window.removeEventListener('pokedex-changed', onPokedexChanged as EventListener)
+  }, [])
+
   return (
     <div>
       <h1 className="text-3xl font-bold mb-4">Pokédex</h1>
       {loading && <div className="text-gray-500">Cargando pokedex...</div>}
       {error && <div className="text-red-500">Error: {error}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {(Array.isArray(list) ? list : []).map(px => (
-          <button key={px.slug} onClick={() => onSelect(px.slug)} className="text-left bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-lg transition flex flex-col">
+          {(Array.isArray(list) ? list : []).map(px => (
+          <button key={px.slug} onClick={() => onSelect(px.slug)} className="text-left card hover:shadow-lg transition flex flex-col">
             <div className="flex items-center justify-between">
               <div className="font-semibold text-lg">{px.name}</div>
               <div className="text-sm text-gray-500">{px.slug}</div>
             </div>
-            <div className="mt-3">
-              <div className="text-sm text-gray-600">Progreso: <span className="font-medium">{px.progress?.percent ?? 0}%</span></div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded h-2 mt-2 overflow-hidden">
-                <div style={{ width: `${px.progress?.percent ?? 0}%` }} className="h-2 bg-gradient-to-r from-green-400 to-blue-600" />
+              <div className="mt-3">
+                <div className="text-sm text-gray-600">Progreso: <span className="font-medium">{px.progress?.percent ?? 0}%</span></div>
+                <div className="progress-track mt-2">
+                  <div className="progress-fill" style={{ width: `${px.progress?.percent ?? 0}%` }} />
+                </div>
               </div>
-            </div>
           </button>
         ))}
       </div>
@@ -181,18 +194,18 @@ export default function Page() {
   }, [selectedPercent, selected])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 container mx-auto">
       {!selected && <PokedexCards onSelect={(s) => setSelected(s)} />}
       {selected && (
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setSelected(null)}>← Volver</button>
+            <button className="px-3 py-1 bg-slate-200 text-gray-900 dark:bg-slate-700 dark:text-white rounded hover:bg-slate-300 dark:hover:bg-slate-600" onClick={() => setSelected(null)}>← Volver</button>
             <h2 className="text-xl font-semibold">Pokédex: {selected}</h2>
           </div>
           <div className="mb-4">
             <div className="text-sm text-gray-600">Progreso: <span className="font-medium">{selectedPercent ?? 0}%</span></div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded h-2 mt-2 overflow-hidden">
-              <div style={{ width: `${selectedPercent ?? 0}%` }} className="h-2 bg-gradient-to-r from-green-400 to-blue-600" />
+            <div className="progress-track mt-2">
+              <div className="progress-fill" style={{ width: `${selectedPercent ?? 0}%` }} />
             </div>
           </div>
           <PokemonList pokedexSlug={selected} onProgressUpdate={(p) => setSelectedPercent(p)} />
